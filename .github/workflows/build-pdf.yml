@@ -1,0 +1,75 @@
+name: Build PDF
+
+# Builds the ASME Turbo 2026 paper into a PDF so it can be reviewed directly
+# from the pull request. The compiled PDF is published as a workflow artifact.
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-pdf:
+    name: Build turbo2026.pdf
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install TeX Live and Ghostscript
+        # texlive-full provides the packages asmeconf.cls needs; ghostscript is
+        # used for the compressed PDF. fonts-texgyre /
+        # fonts-texgyre-math are installed explicitly because texlive-full only
+        # *recommends* them, and --no-install-recommends would otherwise leave
+        # out TeX Gyre Heros (the sans font asmeconf uses for caption/label
+        # text); without it captions and the caption lists render in nullfont.
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            texlive-full ghostscript fonts-texgyre fonts-texgyre-math
+
+      - name: Initialize the LuaTeX/OpenType font database
+        run: luaotfload-tool --update --force
+
+      - name: Build PDF (full build with bibliography)
+        run: |
+          lualatex -interaction=nonstopmode turbo2026.tex
+          bibtex turbo2026
+          lualatex -interaction=nonstopmode turbo2026.tex
+          lualatex -interaction=nonstopmode turbo2026.tex
+
+      - name: Compress PDF
+        run: |
+          gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 \
+             -dDownsampleColorImages=true -dColorImageResolution=300 \
+             -dDownsampleGrayImages=true -dGrayImageResolution=300 \
+             -dDownsampleMonoImages=true -dMonoImageResolution=600 \
+             -dNOPAUSE -dQUIET -dBATCH \
+             -sOutputFile=turbo2026_compressed.pdf turbo2026.pdf
+
+      - name: Verify the PDF built cleanly
+        # lualatex runs in \nonstopmode, so a missing font does not
+        # fail the run on its own. Guard against that class of silent breakage
+        # by failing if the log shows nullfont or undefined-font errors.
+        run: |
+          test -f turbo2026.pdf
+          if grep -qa "in font nullfont" turbo2026.log || grep -qa "is undefined" turbo2026.log; then
+            echo "::error::Font errors detected in turbo2026.log (nullfont / undefined font)."
+            grep -an "in font nullfont\|is undefined" turbo2026.log | head -20
+            exit 1
+          fi
+          grep -a "Output written" turbo2026.log
+
+      - name: Upload PDF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: turbo2026-pdf
+          path: |
+            turbo2026.pdf
+            turbo2026_compressed.pdf
+          if-no-files-found: error

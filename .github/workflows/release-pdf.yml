@@ -1,0 +1,92 @@
+name: Attach PDF to Release
+
+# When a release is published (or a tag is pushed), build the paper and attach
+# the full and compressed PDFs to the release. This avoids committing binaries
+# to the repository and avoids building locally. It uses only the built-in
+# GITHUB_TOKEN and the preinstalled gh CLI -- no third-party actions, to stay
+# within the repository's Actions policy.
+#
+# Two entry points are supported:
+#   - "Draft a new release" in the GitHub UI  -> release: published
+#   - pushing a bare tag (git push origin <tag>) -> push: tags; the release is
+#     created from the tag automatically.
+
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - '**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: attach-pdf-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  attach-pdf:
+    name: Build and attach PDFs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install TeX Live and Ghostscript
+        # fonts-texgyre / fonts-texgyre-math are required because texlive-full
+        # only *recommends* them; without TeX Gyre Heros, asmeconf renders
+        # caption labels and lists in nullfont.
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            texlive-full ghostscript fonts-texgyre fonts-texgyre-math
+
+      - name: Initialize the LuaTeX/OpenType font database
+        run: luaotfload-tool --update --force
+
+      - name: Build PDF (full build with bibliography)
+        run: |
+          lualatex -interaction=nonstopmode turbo2026.tex
+          bibtex turbo2026
+          lualatex -interaction=nonstopmode turbo2026.tex
+          lualatex -interaction=nonstopmode turbo2026.tex
+
+      - name: Compress PDF
+        run: |
+          gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 \
+             -dDownsampleColorImages=true -dColorImageResolution=300 \
+             -dDownsampleGrayImages=true -dGrayImageResolution=300 \
+             -dDownsampleMonoImages=true -dMonoImageResolution=600 \
+             -dNOPAUSE -dQUIET -dBATCH \
+             -sOutputFile=turbo2026_compressed.pdf turbo2026.pdf
+
+      - name: Verify the PDF built cleanly
+        run: |
+          test -f turbo2026.pdf
+          test -f turbo2026_compressed.pdf
+          if grep -qa "in font nullfont" turbo2026.log || grep -qa "is undefined" turbo2026.log; then
+            echo "::error::Font errors detected in turbo2026.log (nullfont / undefined font)."
+            grep -an "in font nullfont\|is undefined" turbo2026.log | head -20
+            exit 1
+          fi
+          grep -a "Output written" turbo2026.log
+
+      - name: Attach PDFs to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "Target tag: $TAG"
+          # Create the release if it does not exist yet (e.g. when triggered by
+          # a bare tag push); otherwise reuse the existing release. --clobber
+          # makes re-runs idempotent.
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" turbo2026.pdf turbo2026_compressed.pdf \
+            --repo "$GITHUB_REPOSITORY" --clobber
