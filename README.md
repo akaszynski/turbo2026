@@ -2,7 +2,7 @@
 
 ![Full rotor mode 192: GMM prediction (left) versus mode from TWE (right)](docs/fig22-mode-192.png)
 
-*Fig. 22 Full rotor mode 192: GMM prediction (left) versus mode from TWE (right).*
+*Full rotor mode 192: GMM prediction (left) versus mode from TWE (right).*
 
 **[Download the paper (PDF)](https://github.com/akaszynski/turbo2026/releases/latest/download/turbo2026.pdf)** · [compressed](https://github.com/akaszynski/turbo2026/releases/latest/download/turbo2026_compressed.pdf)
 
@@ -20,6 +20,10 @@ bibtex turbo2026
 lualatex turbo2026.tex
 lualatex turbo2026.tex
 ```
+
+## AI Notice
+
+AI (LLMs) was not used to write or format the conference or journal paper. Anthropic's Claude was only used to help generate this repo by removing all references to private Python scripts and internal datasets to generate this paper. These changes were reviewed to ensure the original text and formatting of the paper remained intact; only comments and internal dataset references were removed.
 
 ## Copyright Notice
 
