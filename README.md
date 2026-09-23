@@ -1,5 +1,11 @@
 # Experimental Investigation of As-manufactured Modeling for Integrally Bladed Rotor Frequencies and Mode Shapes
 
+![Full rotor mode 192: GMM prediction (left) versus mode from TWE (right)](docs/fig22-mode-192.png)
+
+*Fig. 22 Full rotor mode 192: GMM prediction (left) versus mode from TWE (right).*
+
+**[Download the paper (PDF)](https://github.com/akaszynski/turbo2026/releases/latest/download/turbo2026.pdf)** · [compressed](https://github.com/akaszynski/turbo2026/releases/latest/download/turbo2026_compressed.pdf)
+
 LaTeX source for ASME Turbo Expo 2026 paper TURBO2026-179212.
 
 **Authors:** Alex Kaszynski, Lucas Smith, Justin Warner, Jeffrey M. Brown
